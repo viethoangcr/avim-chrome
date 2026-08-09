@@ -1,3 +1,8 @@
+/*
+ * Modified 2026-08-06 for the AVIM Vietnamese IME fork (see NOTICE):
+ * messaging migrated to chrome.runtime, with runtime.lastError handling
+ * in the save/get callbacks. Popup logic otherwise unchanged.
+ */
 (function(window){
 	function setAVIMConfig(key, value) {
 		var obj = {'save_prefs':'all'};
@@ -7,7 +12,10 @@
 		if (key == 'onOff') {
 			obj = {'save_prefs':'all', 'onOff' : value};
 		}
-		chrome.extension.sendMessage(obj, function(response){
+		chrome.runtime.sendMessage(obj, function(response){
+			if (chrome.runtime.lastError || !response) {
+				return;
+			}
 			window.location.reload();
 		});
 	}
@@ -42,7 +50,10 @@
 		var viqrEle = $g("viqr");
 		var viqrStarEle = $g("viqrStar");
 		
-		chrome.extension.sendMessage({'get_prefs':'all'}, function(response){
+		chrome.runtime.sendMessage({'get_prefs':'all'}, function(response){
+			if (chrome.runtime.lastError || !response) {
+				return;
+			}
 			if (response.onOff === 0) {
 				offEle.checked = true;
 			} else {

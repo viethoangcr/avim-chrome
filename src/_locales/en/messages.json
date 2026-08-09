@@ -1,10 +1,10 @@
 {
 	"extName" : {
-		"message" : "AVIM - Vietnamese Input Method",
+		"message" : "AVIM Vietnamese IME",
 		"description" : "Extension name"
 	},
 	"extDescription" : {
-		"message" : "An input method editor (IME) for Vietnamese, best choice for Chrome.",
+		"message" : "A local Vietnamese input method editor (IME) for Chrome with Telex, VNI, VIQR and VIQR* methods and popup settings.",
 		"description" : "Extension description"
 	},
 	"extAction" : {

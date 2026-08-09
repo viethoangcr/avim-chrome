@@ -1,7 +1,13 @@
+/*
+ * Modified 2026-08-06 for the AVIM Vietnamese IME fork (see NOTICE):
+ * messaging migrated to chrome.runtime, with a response callback that
+ * tolerates a missing response during extension reload or page teardown.
+ * Content-script behavior otherwise unchanged.
+ */
 
-var extension = chrome.extension;
+var runtime = chrome.runtime;
 var document = window.document;
-var sendRequest = extension.sendMessage;
+var sendRequest = runtime.sendMessage;
 var allFrames = [];
 
 var inputTypes = ["textarea", "text", "search", "tel"];
@@ -97,7 +103,7 @@ function _keyUpHandler(evt) {
 	if (code == 17) {
 		if (isPressCtrl) {
 			isPressCtrl = false;
-			sendRequest({'turn_avim':'onOff'}, configAVIM);
+			sendRequest({'turn_avim':'onOff'}, configAVIMResponse);
 		} else {
 			isPressCtrl = true;
 			// Must press twice in 300ms
@@ -200,9 +206,18 @@ function configAVIM(data) {
 	newAVIMInit();
 }
 
-sendRequest({'get_prefs':'all'}, configAVIM);
+// Response callback: a missing response (extension reload, page teardown)
+// keeps the current configuration instead of throwing or re-initializing.
+function configAVIMResponse(data) {
+	if (chrome.runtime.lastError) {
+		return;
+	}
+	configAVIM(data);
+}
 
-extension.onMessage.addListener(function(request, sender, sendResponse){
+sendRequest({'get_prefs':'all'}, configAVIMResponse);
+
+runtime.onMessage.addListener(function(request, sender, sendResponse){
 	configAVIM(request);
 });
 
