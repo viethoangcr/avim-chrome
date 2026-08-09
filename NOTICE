@@ -1,0 +1,35 @@
+AVIM Vietnamese IME
+===================
+
+This is a modified and independently maintained fork of the
+avim-chrome Chrome extension, prepared 2026-08-06 for Manifest V3
+and maintained at https://github.com/viethoangcr/avim-chrome.
+
+Original work and credit
+------------------------
+
+- AVIM JavaScript Vietnamese Input Method by Hieu Tran Dang
+  (Copyright (C) 2004-2008 Hieu Tran Dang; original source dated
+  28-07-2008).
+- avim-chrome, the Chrome extension packaging and IME configuration
+  by Nguyen Kim Kha (Copyright (C) 2011-2015).
+
+The upstream authors do not maintain and do not endorse this
+release. Report problems to this fork's issue tracker, not to the
+upstream authors.
+
+License and source availability
+-------------------------------
+
+This work is licensed under the GNU General Public License
+version 3 (GPLv3); the full text is in the LICENSE file.
+
+Corresponding source and build instructions are published at:
+
+  https://github.com/viethoangcr/avim-chrome
+
+Behavior
+--------
+
+Keystrokes are processed locally in matching page inputs. This
+extension collects, sells, and transmits no user data.

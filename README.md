@@ -1,12 +1,52 @@
-avim-chrome [![Build Status](https://travis-ci.org/kimkha/avim-chrome.svg?branch=master)](https://travis-ci.org/kimkha/avim-chrome)
-===========
+# AVIM Vietnamese IME
 
-Bộ gõ tiếng Việt AVIM được tùy chỉnh cho tương thích với trình duyệt Google Chrome và Opera:
+A Vietnamese input method editor (IME) extension for Google Chrome
+(Manifest V3). It supports the Telex, VNI, VIQR and VIQR* input methods,
+selectable from the popup, with an optional spell check and old-accent
+handling. Typing is processed locally in page inputs; the extension
+collects no user data and declares only the static `storage` permission
+plus HTTP(S) content-script matches.
 
-* [Cài đặt vào Google Chrome](https://chrome.google.com/webstore/detail/opgbbffpdglhkpglnlkiclakjlpiedoh)
-* [Cài đặt vào Opera](https://addons.opera.com/extensions/details/avim-vietnamese-input-method/)
+This is a modified, independently maintained fork of the avim-chrome
+extension by Nguyen Kim Kha, which is based on the AVIM engine by
+Hieu Tran Dang. The upstream authors do not maintain and do not endorse
+this release.
 
-## Xem thêm
+## Install
 
-* [AVIM cho Firefox](http://avim.1ec5.org/) tương tích với các trình duyệt Firefox và SeaMonkey, chương trình thư điện tử Thunderbird, trình soạn thảo mã Komodo, và trình soạn thảo BlueGriffon.
-* [Brackets-AVIM](https://github.com/baivong/brackets-avim) tương thích với trình soạn thảo Brackets.
+- Chrome Web Store listing: **AVIM Vietnamese IME** (version 0.1.0).
+  The new listing has a new Store extension ID; preferences from the old
+  extension cannot and do not migrate.
+- For development: open `chrome://extensions`, enable Developer mode,
+  and "Load unpacked" the `build/` directory produced by the build
+  below.
+
+## Build and test
+
+Requires Node.js 22 and npm 10.
+
+    npm ci
+    npm run lint
+    npm test
+    npm run build
+
+The build writes the unpacked extension to `build/` and a single Store
+ZIP to `dist/avim-vietnamese-ime-0.1.0.zip` containing the manifest,
+locales, icons, popup, worker, `LICENSE` and `NOTICE`.
+
+## Source and license
+
+- Repository and corresponding source:
+  https://github.com/viethoangcr/avim-chrome
+- Issues and support:
+  https://github.com/viethoangcr/avim-chrome/issues
+
+Licensed under GPLv3 — see `LICENSE`. Fork and attribution details are
+in `NOTICE`.
+
+## Limits
+
+- Works on HTTP(S) pages only, via static content scripts; protected
+  browser pages and `file:` pages without a user grant are not
+  supported.
+- The popup demo input is a local demonstration of the engine only.

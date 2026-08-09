@@ -1,143 +1,122 @@
-(function(window){
-	var localStorage = window.localStorage;
+/*
+ * MV3 background service worker: storage-backed preferences and badge.
+ * A worker may be terminated between events, so no settings live in globals;
+ * every handler reads chrome.storage.local and restores the badge from it.
+ * No window/DOM: this file must run in a service worker global scope.
+ *
+ * Modified 2026-08-06 for the AVIM Vietnamese IME fork (see NOTICE):
+ * rewritten from the MV2 background page to this storage-backed service
+ * worker; original localStorage and context-menu code removed.
+ */
 
-	function setLocalStorageItem(key, value) {
-	  if (localStorage)
-		localStorage[key] = value;
+/* jshint globalstrict: true */
+/* global chrome */
+'use strict';
+
+var DEFAULT_PREFS = { method: 0, onOff: 1, ckSpell: 1, oldAccent: 1 };
+var PREF_FIELDS = ['method', 'onOff', 'ckSpell', 'oldAccent'];
+
+// Untrusted message values: method is an integer 0-4, the rest are 0 or 1.
+function isPrefValue(field, value) {
+	if (field === 'method') {
+		return typeof value === 'number' && value === Math.floor(value) && value >= 0 && value <= 4;
 	}
+	return value === 0 || value === 1;
+}
 
-	function getLocalStorageItem(key) {
-	  if (localStorage)
-		return localStorage.getItem(key);
-
-	  return ;
-	}
-
-	function getPrefs(callback) {
-		if (!getLocalStorageItem('method')) {
-			init();
-		}
-		var prefs = {
-			'method': parseInt(getLocalStorageItem('method')),
-			'onOff': parseInt(getLocalStorageItem('onOff')),
-			'ckSpell': parseInt(getLocalStorageItem('ckSpell')),
-			'oldAccent': parseInt(getLocalStorageItem('oldAccent'))
-		};
-
-		callback.call(this, prefs);
-	}
-
-	function turnAvim(callback) {
-		if (!getLocalStorageItem('method')) {
-			init();
-		}
-
-		var onOff = getLocalStorageItem('onOff');
-		setLocalStorageItem('onOff', onOff=='1'?'0':'1');
-
-		getPrefs(function(prefs){
-			updateAllTabs(prefs);
-			callback.call(this);
+// Read with defaults so incomplete stored data is safe; always returns the
+// full canonical preference object.
+function readPrefs(callback) {
+	chrome.storage.local.get(DEFAULT_PREFS, function(stored) {
+		callback({
+			method: stored.method,
+			onOff: stored.onOff,
+			ckSpell: stored.ckSpell,
+			oldAccent: stored.oldAccent
 		});
-	}
+	});
+}
 
-	function updateAllTabs(prefs) {
-		chrome.tabs.query({}, function(tabs){
-			for (var i=0; i<tabs.length; i++) {
-				var tab = tabs[i];
-				chrome.tabs.sendMessage(tab.id, prefs);
+function updateBadge(prefs) {
+	var on = prefs.onOff === 1;
+	chrome.action.setBadgeText({ text: on ? 'on' : 'off' });
+	chrome.action.setBadgeBackgroundColor({ color: on ? [0, 255, 0, 255] : [255, 0, 0, 255] });
+}
+
+// Reading lastError consumes the per-tab delivery error; protected pages
+// and tabs without the content script are expected delivery failures.
+function consumeTabError() {
+	void chrome.runtime.lastError;
+}
+
+// Push prefs to every tab. Only tab ids are read.
+function pushPrefsToTabs(prefs) {
+	chrome.tabs.query({}, function(tabs) {
+		for (var i = 0; i < tabs.length; i++) {
+			chrome.tabs.sendMessage(tabs[i].id, prefs, consumeTabError);
+		}
+	});
+}
+
+function savePrefs(request, sendResponse) {
+	readPrefs(function() {
+		var changes = {};
+		for (var i = 0; i < PREF_FIELDS.length; i++) {
+			var field = PREF_FIELDS[i];
+			if (request.hasOwnProperty(field) && isPrefValue(field, request[field])) {
+				changes[field] = request[field];
 			}
+		}
+		chrome.storage.local.set(changes, function() {
+			readPrefs(function(prefs) {
+				updateBadge(prefs);
+				pushPrefsToTabs(prefs);
+				sendResponse(prefs);
+			});
 		});
+	});
+}
 
-		updateIcon(prefs);
-	}
-
-	function updateIcon(prefs) {
-		var txt = {};
-		var bg = {};
-
-		if (prefs.onOff == 1) {
-			txt.text = "on";
-			bg.color = [0, 255, 0, 255];
-		} else {
-			txt.text = "off";
-			bg.color = [255, 0, 0, 255];
-		}
-
-		chrome.browserAction.setBadgeText(txt);
-		chrome.browserAction.setBadgeBackgroundColor(bg);
-	}
-
-	function savePrefs(request, callback) {
-		if (typeof request.method != 'undefined') {
-			setLocalStorageItem("method", request.method);
-		}
-		if (typeof request.onOff != 'undefined') {
-			setLocalStorageItem("onOff", request.onOff);
-		}
-		if (typeof request.ckSpell != 'undefined') {
-			setLocalStorageItem("ckSpell", request.ckSpell);
-		}
-		if (typeof request.oldAccent != 'undefined') {
-			setLocalStorageItem("oldAccent", request.oldAccent);
-		}
-
-		getPrefs(function(prefs){
-			updateAllTabs(prefs);
-			callback.call(this);
+function toggleAvim(sendResponse) {
+	readPrefs(function(stored) {
+		var next = stored.onOff === 1 ? 0 : 1;
+		chrome.storage.local.set({ onOff: next }, function() {
+			readPrefs(function(prefs) {
+				updateBadge(prefs);
+				pushPrefsToTabs(prefs);
+				sendResponse(prefs);
+			});
 		});
+	});
+}
+
+chrome.runtime.onInstalled.addListener(function(details) {
+	// A fresh install persists the exact defaults; an update or Chrome update
+	// never overwrites user settings. Either way the badge is restored.
+	if (details.reason === 'install') {
+		chrome.storage.local.set(DEFAULT_PREFS, function() {
+			readPrefs(updateBadge);
+		});
+	} else {
+		readPrefs(updateBadge);
 	}
+});
 
-	function processRequest(request, sender, sendResponse) {
-		if (request.get_prefs) {
-			getPrefs(sendResponse);
-			return;
-		}
+chrome.runtime.onStartup.addListener(function() {
+	readPrefs(updateBadge);
+});
 
-		if (request.save_prefs) {
-			savePrefs(request, sendResponse);
-			return;
-		}
-
-		if (request.turn_avim) {
-			turnAvim(sendResponse);
-			return;
-		}
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+	if (request && request.get_prefs) {
+		readPrefs(sendResponse);
+		return true;
 	}
-
-	function genericOnClick() {
-		alert("demo");
+	if (request && request.save_prefs) {
+		savePrefs(request, sendResponse);
+		return true;
 	}
-
-	function createMenus() {
-		var parentId = chrome.contextMenus.create({"title" : "AVIM", "contexts" : ["selection"]});
-		var demo = chrome.contextMenus.create({"title" : "AVIM Demo", "contexts" : ["selection"], "parentId": parentId, "onclick": genericOnClick});
+	if (request && request.turn_avim) {
+		toggleAvim(sendResponse);
+		return true;
 	}
-
-	function init() {
-		if (!getLocalStorageItem('method')) {
-			setLocalStorageItem('method', '0');
-		}
-
-		if (!getLocalStorageItem('onOff')) {
-			setLocalStorageItem('onOff', '1');
-		}
-
-		if (!getLocalStorageItem('ckSpell')) {
-			setLocalStorageItem('ckSpell', '1');
-		}
-
-		if (!getLocalStorageItem('oldAccent')) {
-			setLocalStorageItem('oldAccent', '1');
-		}
-
-		getPrefs(updateIcon);
-
-		chrome.extension.onMessage.addListener(processRequest);
-
-		//createMenus();
-	}
-
-	init();
-
-})(window);
+});

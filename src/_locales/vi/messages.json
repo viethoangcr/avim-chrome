@@ -1,10 +1,10 @@
 {
 	"extName" : {
-		"message" : "AVIM - Bộ Gõ Tiếng Việt",
+		"message" : "AVIM Vietnamese IME",
 		"description" : "Extension name"
 	},
 	"extDescription" : {
-		"message" : "Bộ gõ tiếng Việt dành cho Chrome, hoạt động tốt trên hầu hết các trang web hiện có.",
+		"message" : "Bộ gõ tiếng Việt chạy cục bộ trên các trang HTTP(S) với các kiểu gõ Telex, VNI, VIQR và VIQR* và các tùy chọn trong popup.",
 		"description" : "Extension description"
 	},
 	"extAction" : {
