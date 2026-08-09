@@ -16,7 +16,7 @@ maintain and do not endorse this release.
 
 ## Install
 
-- Chrome Web Store listing: **AVIM Vietnamese IME** (version 0.1.0).
+- Chrome Web Store listing: **AVIM Vietnamese IME** (version 0.2.0).
   The new listing has a new Store extension ID; preferences from the old
   extension cannot and do not migrate.
 - For development: open `chrome://extensions`, enable Developer mode,
@@ -42,7 +42,7 @@ Requires Node.js 22 and npm 10.
   manifest and zips the result.
 
 The build writes the unpacked extension to `build/` and a single Store
-ZIP to `dist/avim-vietnamese-ime-0.1.0.zip` containing the manifest,
+ZIP to `dist/avim-vietnamese-ime-0.2.0.zip` containing the manifest,
 locales, icons, popup, worker, `LICENSE` and `NOTICE`.
 
 ## Source architecture
