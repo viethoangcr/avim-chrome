@@ -147,6 +147,12 @@ describe('fork identity (Task 6)', function() {
 			expect(readme).toContain('do not');
 			expect(readme).toContain('endorse');
 		});
+
+		it('documents the TypeScript chrome layer and the esbuild toolchain', function() {
+			expect(readme).toContain('TypeScript');
+			expect(readme).toContain('esbuild');
+			expect(readme).toContain('avim.js');
+		});
 	});
 
 	describe('built archive', function() {

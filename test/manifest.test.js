@@ -1,7 +1,7 @@
 /*
  * Manifest MV3 contract for Task 3: the source manifest is MV3 and the
  * build-time rewrite keeps every MV3 field while listing only the content
- * bundle. The build-manifest assertions run the real gulpfile rewrite over
+ * bundle. The build-manifest assertions run the real build-script rewrite over
  * the source manifest, so they test the shipped build/ contract, not a copy.
  */
 
@@ -28,6 +28,10 @@ describe('manifest (MV3)', function() {
 
 	it('declares manifest_version 3', function() {
 		expect(manifest.manifest_version).toBe(3);
+	});
+
+	it('requires Chrome 116 or newer', function() {
+		expect(manifest.minimum_chrome_version).toBe('116');
 	});
 
 	it('uses action with the same icon, title and popup as browser_action', function() {
@@ -78,8 +82,8 @@ describe('manifest (MV3)', function() {
 		var buildManifest;
 
 		beforeAll(async function() {
-			var gulpfile = await import('../gulpfile.mjs');
-			buildManifest = gulpfile.buildManifest(JSON.parse(JSON.stringify(readManifest())));
+			var build = await import('../scripts/build.mjs');
+			buildManifest = build.buildManifest(JSON.parse(JSON.stringify(readManifest())));
 		});
 
 		it('is MV3 and lists only the content bundle', function() {
@@ -101,6 +105,7 @@ describe('manifest (MV3)', function() {
 			});
 			expect(buildManifest.permissions).toEqual(['storage']);
 			expect(buildManifest.version).toBe('0.1.0');
+			expect(buildManifest.minimum_chrome_version).toBe('116');
 			expect(buildManifest.browser_action).toBeUndefined();
 			expect(buildManifest.background.scripts).toBeUndefined();
 			expect(buildManifest.offline_enabled).toBeUndefined();

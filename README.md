@@ -30,9 +30,29 @@ Requires Node.js 22 and npm 10.
     npm test
     npm run build
 
+- `npm ci` installs the pinned dependency tree.
+- `npm run lint` runs eslint over the JS sources, scripts and tests, plus
+  `tsc --noEmit` over the TypeScript sources.
+- `npm test` runs the jasmine suite.
+- `npm run build` runs the Node build script (`scripts/build.mjs`) which
+  compiles the TypeScript chrome layer with esbuild, concatenates and
+  minifies the content bundle, copies the static assets, builds the
+  manifest and zips the result.
+
 The build writes the unpacked extension to `build/` and a single Store
 ZIP to `dist/avim-vietnamese-ime-0.1.0.zip` containing the manifest,
 locales, icons, popup, worker, `LICENSE` and `NOTICE`.
+
+## Source architecture
+
+- `src/chrome/*.ts` (background and popup) and `src/scripts/extension.ts`
+  (content script) are TypeScript, compiled by esbuild. Shared message
+  types live in `src/shared/messages.ts`.
+- `src/scripts/avim.js` is the legacy GPL input engine (by Hieu Tran Dang),
+  preserved byte-for-byte. The build consumes it as the concatenated
+  content bundle (`build/scripts/avim.js`) and as the popup demo engine
+  (`build/scripts/popup-avim.js`). A future project migrates it to
+  TypeScript.
 
 ## Source and license
 

@@ -1,24 +1,28 @@
 /*
  * Modified 2026-08-06 for the AVIM Vietnamese IME fork (see NOTICE):
- * messaging migrated to chrome.runtime, with a response callback that
- * tolerates a missing response during extension reload or page teardown.
+ * messaging migrated to chrome.runtime, promise-based, with the typed
+ * message envelope; a missing response (extension reload or page teardown)
+ * keeps the current configuration instead of throwing or re-initializing.
  * Content-script behavior otherwise unchanged.
  */
+import type { GetPrefsMessage, Prefs, PrefsPushMessage, RequestMessage, TurnAvimMessage } from '../shared/messages';
 
-var runtime = chrome.runtime;
 var document = window.document;
-var sendRequest = runtime.sendMessage;
-var allFrames = [];
+var allFrames: any = [];
 
 var inputTypes = ["textarea", "text", "search", "tel"];
 
-function AVIMInit(AVIM, isAttach) {
+function sendRequest(msg: RequestMessage): Promise<Prefs> {
+	return chrome.runtime.sendMessage(msg) as Promise<Prefs>;
+}
+
+function AVIMInit(AVIM: any, isAttach: boolean) {
 	allFrames = document.getElementsByTagName("iframe");
 	for(AVIM.g = 0; AVIM.g < allFrames.length; AVIM.g++) {
 		if(findIgnore(allFrames[AVIM.g])) {
 			continue;
 		}
-		var iframedit;
+		var iframedit: any;
 		try {
 			AVIM.wi = allFrames[AVIM.g].contentWindow;
 			iframedit = AVIM.wi.document;
@@ -37,8 +41,8 @@ function AVIMInit(AVIM, isAttach) {
 	}/**/
 }
 
-function findIgnore(el) {
-	var va = exclude, i;
+function findIgnore(el: any): boolean {
+	var va = exclude, i: number;
 	for(i = 0; i < va.length; i++) {
 		if((va[i].length > 0) && (el.name == va[i] || el.id == va[i])) {
 			return true;
@@ -47,7 +51,7 @@ function findIgnore(el) {
 	return false;
 }
 
-function findFrame() {
+function findFrame(): any {
 	for(var i = 0; i < allFrames.length; i++) {
 		if(findIgnore(allFrames[i])) return;
 		AVIMObj.frame = allFrames[i];
@@ -65,7 +69,7 @@ function findFrame() {
 	}
 }
 
-function _keyPressHandler(e) {
+function _keyPressHandler(e: any) {
 	var el = e.target, code = e.which;
 	if(e.ctrlKey) {
 		return;
@@ -96,14 +100,14 @@ function _keyPressHandler(e) {
 }
 
 var isPressCtrl = false;
-function _keyUpHandler(evt) {
+function _keyUpHandler(evt: any) {
 	var code = evt.which;
 
 	// Press Ctrl twice to off/on AVIM
 	if (code == 17) {
 		if (isPressCtrl) {
 			isPressCtrl = false;
-			sendRequest({'turn_avim':'onOff'}, configAVIMResponse);
+			void sendRequest({ type: 'turn_avim' } as TurnAvimMessage).then(configAVIM).catch(() => {});
 		} else {
 			isPressCtrl = true;
 			// Must press twice in 300ms
@@ -116,48 +120,46 @@ function _keyUpHandler(evt) {
 	}
 }
 
-function _keyDownHandler(evt) {
-	var key;
+function _keyDownHandler(evt: any) {
+	var key: any;
 	if(evt == "iframe") {
 		AVIMObj.frame = findFrame();
 		key = AVIMObj.frame.event.keyCode;
 	} else {
 		key = evt.which;
 	}
+	void key; // legacy dead store, ported verbatim
 }
 
-function keyUpHandler(evt) {
+function keyUpHandler(evt: any) {
 	_keyUpHandler(evt);
-	console.log("keyUpHandler");
 }
 
-function keyDownHandler(evt) {
+function keyDownHandler(evt: any) {
 	_keyDownHandler(evt);
-	console.log("keyDownHandler");
 }
 
-function keyPressHandler(evt) {
+function keyPressHandler(evt: any) {
 	var success = _keyPressHandler(evt);
 	if (success === false) {
 		evt.preventDefault();
 	}
-	console.log("keyPressHandler");
 }
 
-function attachEvt(obj, evt, handle, capture) {
+function attachEvt(obj: any, evt: string, handle: any, capture: boolean) {
 	obj.addEventListener(evt, handle, capture);
 }
 
-function removeEvt(obj, evt, handle, capture) {
+function removeEvt(obj: any, evt: string, handle: any, capture: boolean) {
 	obj.removeEventListener(evt, handle, capture);
 }
 
 var ajaxCounter = 0;
 function AVIMAJAXFix() {
-	if (isNaN(parseInt(ajaxCounter))) {
+	if (isNaN(parseInt(String(ajaxCounter)))) {
 		ajaxCounter = 0;
 	} else {
-		ajaxCounter = parseInt(ajaxCounter);
+		ajaxCounter = parseInt(String(ajaxCounter));
 	}
 	AVIMInit(AVIMObj, true);
 	ajaxCounter++;
@@ -195,7 +197,7 @@ function newAVIMInit() {
 	attachEvt(document, "keypress", keyPressHandler, true);
 }
 
-function configAVIM(data) {
+function configAVIM(data: Prefs) {
 	if (data) {
 		method = data.method;
 		onOff = data.onOff;
@@ -206,18 +208,10 @@ function configAVIM(data) {
 	newAVIMInit();
 }
 
-// Response callback: a missing response (extension reload, page teardown)
-// keeps the current configuration instead of throwing or re-initializing.
-function configAVIMResponse(data) {
-	if (chrome.runtime.lastError) {
-		return;
-	}
-	configAVIM(data);
-}
+// Promise-form lastError tolerance: a missing response (extension reload,
+// page teardown) keeps the current configuration instead of re-initializing.
+void sendRequest({ type: 'get_prefs' } as GetPrefsMessage).then(configAVIM).catch(() => {});
 
-sendRequest({'get_prefs':'all'}, configAVIMResponse);
-
-runtime.onMessage.addListener(function(request, sender, sendResponse){
-	configAVIM(request);
+chrome.runtime.onMessage.addListener((message: PrefsPushMessage) => {
+	if (message?.type === 'prefs') configAVIM(message.prefs);
 });
-
