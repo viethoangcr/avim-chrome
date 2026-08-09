@@ -1,25 +1,41 @@
 /*
- * Service-worker contract for Task 4: the background script is an MV3
+ * Service-worker contract for Task 3.3: the background script is an MV3
  * classic service worker whose preferences live in chrome.storage.local.
  *
- * The script is loaded in a Node `vm` sandbox with a small chrome mock that
- * records listener registration, storage, badge calls, tab fan-out and
- * per-tab runtime.lastError reads. No browser automation, no dependencies.
+ * The COMPILED script (build/chrome/background.js, esbuild output of the
+ * TypeScript source) is loaded in a Node `vm` sandbox against a
+ * promise-returning chrome mock that records listener registration, storage,
+ * badge calls and tab fan-out. No browser automation, no dependencies.
  */
 
 'use strict';
 
 var fs = require('fs');
 var vm = require('vm');
+var path = require('path');
+var execSync = require('child_process').execSync;
 
-var BACKGROUND_PATH = './src/chrome/background.js';
+var ROOT = path.resolve(__dirname, '..');
+var BACKGROUND_PATH = path.join('build', 'chrome', 'background.js');
 
 var DEFAULT_PREFS = { method: 0, onOff: 1, ckSpell: 1, oldAccent: 1 };
 
 var TAB_IDS = [1, 2];
 
-// Load background.js against a fresh chrome mock. Every storage get merges
-// defaults, mirroring chrome.storage.local.get(defaults, callback).
+var unhandledRejections = [];
+
+function recordUnhandled(reason) {
+	unhandledRejections.push(reason);
+}
+
+// Flush the microtask queue (and a macrotask) so promise-based handlers and
+// sendResponse callbacks have run.
+function flush() {
+	return new Promise(function(resolve) { setTimeout(resolve, 0); });
+}
+
+// Load the compiled worker against a fresh chrome mock. Every storage get
+// merges defaults, mirroring chrome.storage.local.get(defaults).
 function loadBackground() {
 	var listeners = { installed: [], started: [], message: [] };
 	var storage = {};
@@ -27,24 +43,22 @@ function loadBackground() {
 	var queryArg;
 	var tabMessages = [];
 	var sentErrors = [];
-	var lastError = null;
-	var lastErrorReads = 0;
 
 	var chrome = {
 		storage: { local: {
-			get: function(defaults, callback) {
+			get: function(defaults) {
 				var result = {};
 				Object.keys(defaults).forEach(function(key) {
 					result[key] = Object.prototype.hasOwnProperty.call(storage, key) ?
 						storage[key] : defaults[key];
 				});
-				callback(result);
+				return Promise.resolve(result);
 			},
-			set: function(values, callback) {
+			set: function(values) {
 				Object.keys(values).forEach(function(key) {
 					storage[key] = values[key];
 				});
-				if (callback) { callback(); }
+				return Promise.resolve();
 			}
 		}},
 		action: {
@@ -57,10 +71,10 @@ function loadBackground() {
 			onMessage: { addListener: function(fn) { listeners.message.push(fn); } }
 		},
 		tabs: {
-			query: function(queryInfo, callback) {
+			query: function(queryInfo) {
 				queryArg = queryInfo;
 				// tabs expose only their id; touching any other property fails
-				callback(TAB_IDS.map(function(id) {
+				return Promise.resolve(TAB_IDS.map(function(id) {
 					return new Proxy({ id: id }, {
 						get: function(target, prop) {
 							if (prop !== 'id') {
@@ -71,26 +85,17 @@ function loadBackground() {
 					});
 				}));
 			},
-			sendMessage: function(tabId, message, callback) {
+			sendMessage: function(tabId, message) {
 				tabMessages.push({ tabId: tabId, message: message });
 				if (sentErrors.indexOf(tabId) !== -1) {
-					lastError = { message: 'Receiving end does not exist.' };
+					return Promise.reject(new Error('Receiving end does not exist.'));
 				}
-				if (callback) { callback(); }
-				lastError = null;
+				return Promise.resolve();
 			}
 		}
 	};
 
-	Object.defineProperty(chrome.runtime, 'lastError', {
-		get: function() {
-			if (lastError) { lastErrorReads++; }
-			return lastError;
-		},
-		configurable: true
-	});
-
-	vm.runInNewContext(fs.readFileSync(BACKGROUND_PATH, 'utf8'), { chrome: chrome });
+	vm.runInNewContext(fs.readFileSync(path.join(ROOT, BACKGROUND_PATH), 'utf8'), { chrome: chrome });
 
 	return {
 		storage: storage,
@@ -98,12 +103,13 @@ function loadBackground() {
 		queryArg: function() { return queryArg; },
 		tabMessages: tabMessages,
 		sentErrors: sentErrors,
-		lastErrorReads: function() { return lastErrorReads; },
 		onInstalled: function(reason) {
 			listeners.installed.forEach(function(fn) { fn({ reason: reason }); });
+			return flush();
 		},
 		onStartup: function() {
 			listeners.started.forEach(function(fn) { fn(); });
+			return flush();
 		},
 		onMessage: function(request) {
 			var result = { returned: undefined, response: undefined, responseCount: 0 };
@@ -113,7 +119,7 @@ function loadBackground() {
 					result.responseCount++;
 				});
 			});
-			return result;
+			return flush().then(function() { return result; });
 		},
 		_assertListeners: function() {
 			expect(listeners.installed.length).toBe(1);
@@ -127,6 +133,15 @@ describe('background service worker (MV3)', function() {
 
 	var env;
 
+	beforeAll(function() {
+		execSync('npm run build', { cwd: ROOT, stdio: 'ignore' });
+		process.on('unhandledRejection', recordUnhandled);
+	});
+
+	afterAll(function() {
+		process.removeListener('unhandledRejection', recordUnhandled);
+	});
+
 	beforeEach(function() {
 		env = loadBackground();
 	});
@@ -136,13 +151,15 @@ describe('background service worker (MV3)', function() {
 	});
 
 	it('writes exactly the four defaults on install', function() {
-		env.onInstalled('install');
-		expect(env.storage).toEqual(DEFAULT_PREFS);
+		return env.onInstalled('install').then(function() {
+			expect(env.storage).toEqual(DEFAULT_PREFS);
+		});
 	});
 
 	it('sets the on badge with green background on install', function() {
-		env.onInstalled('install');
-		expect(env.badge).toEqual({ text: 'on', color: [0, 255, 0, 255] });
+		return env.onInstalled('install').then(function() {
+			expect(env.badge).toEqual({ text: 'on', color: [0, 255, 0, 255] });
+		});
 	});
 
 	it('never overwrites stored prefs on update and restores the badge', function() {
@@ -150,84 +167,105 @@ describe('background service worker (MV3)', function() {
 		env.storage.onOff = 0;
 		env.storage.ckSpell = 0;
 		env.storage.oldAccent = 0;
-		env.onInstalled('update');
-		expect(env.storage).toEqual({ method: 3, onOff: 0, ckSpell: 0, oldAccent: 0 });
-		expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
+		return env.onInstalled('update').then(function() {
+			expect(env.storage).toEqual({ method: 3, onOff: 0, ckSpell: 0, oldAccent: 0 });
+			expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
+		});
 	});
 
 	it('restores the badge from storage on startup, merging defaults', function() {
 		env.storage.onOff = 0;
-		env.onStartup();
-		expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
+		return env.onStartup().then(function() {
+			expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
+		});
 	});
 
 	it('answers get_prefs with canonical prefs, merging defaults on read', function() {
 		env.storage.method = 2;
-		var result = env.onMessage({ get_prefs: 'all' });
-		expect(result.returned).toBe(true);
-		expect(result.responseCount).toBe(1);
-		expect(result.response).toEqual({ method: 2, onOff: 1, ckSpell: 1, oldAccent: 1 });
-		expect(env.tabMessages.length).toBe(0);
+		return env.onMessage({ type: 'get_prefs' }).then(function(result) {
+			expect(result.returned).toBe(true);
+			expect(result.responseCount).toBe(1);
+			expect(result.response).toEqual({ method: 2, onOff: 1, ckSpell: 1, oldAccent: 1 });
+			expect(env.tabMessages.length).toBe(0);
+		});
 	});
 
 	it('partial save canonicalizes the response and keeps untouched prefs', function() {
-		env.onInstalled('install');
-		var result = env.onMessage({ save_prefs: 'all', method: 4 });
-		expect(result.returned).toBe(true);
-		expect(result.responseCount).toBe(1);
-		expect(result.response).toEqual({ method: 4, onOff: 1, ckSpell: 1, oldAccent: 1 });
-		expect(env.storage).toEqual({ method: 4, onOff: 1, ckSpell: 1, oldAccent: 1 });
+		return env.onInstalled('install').then(function() {
+			return env.onMessage({ type: 'save_prefs', prefs: { method: 4 } }).then(function(result) {
+				expect(result.returned).toBe(true);
+				expect(result.responseCount).toBe(1);
+				expect(result.response).toEqual({ method: 4, onOff: 1, ckSpell: 1, oldAccent: 1 });
+				expect(env.storage).toEqual({ method: 4, onOff: 1, ckSpell: 1, oldAccent: 1 });
+			});
+		});
 	});
 
 	it('rejects malformed field values and answers with the stored prefs', function() {
-		var result = env.onMessage({ save_prefs: 'all', method: 9, onOff: 2, ckSpell: 'x', oldAccent: 1.5 });
-		expect(result.returned).toBe(true);
-		expect(result.response).toEqual(DEFAULT_PREFS);
-		expect(env.storage).toEqual({});
+		return env.onMessage({
+			type: 'save_prefs',
+			prefs: { method: 9, onOff: 2, ckSpell: 'x', oldAccent: 1.5 }
+		}).then(function(result) {
+			expect(result.returned).toBe(true);
+			expect(result.response).toEqual(DEFAULT_PREFS);
+			expect(env.storage).toEqual({});
+		});
 	});
 
 	it('accepts only known fields and ignores the rest', function() {
-		var result = env.onMessage({ save_prefs: 'all', method: 3, junk: 'x' });
-		expect(result.response).toEqual({ method: 3, onOff: 1, ckSpell: 1, oldAccent: 1 });
-		expect(Object.keys(env.storage)).toEqual(['method']);
+		return env.onMessage({ type: 'save_prefs', prefs: { method: 3, junk: 'x' } }).then(function(result) {
+			expect(result.response).toEqual({ method: 3, onOff: 1, ckSpell: 1, oldAccent: 1 });
+			expect(Object.keys(env.storage)).toEqual(['method']);
+		});
 	});
 
 	it('toggle flips onOff, answers canonical prefs and updates the badge', function() {
-		env.onInstalled('install');
-		var result = env.onMessage({ turn_avim: 'onOff' });
-		expect(result.returned).toBe(true);
-		expect(result.responseCount).toBe(1);
-		expect(result.response).toEqual({ method: 0, onOff: 0, ckSpell: 1, oldAccent: 1 });
-		expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
-		var again = env.onMessage({ turn_avim: 'onOff' });
-		expect(again.response.onOff).toBe(1);
-		expect(env.badge).toEqual({ text: 'on', color: [0, 255, 0, 255] });
+		return env.onInstalled('install').then(function() {
+			return env.onMessage({ type: 'turn_avim' }).then(function(result) {
+				expect(result.returned).toBe(true);
+				expect(result.responseCount).toBe(1);
+				expect(result.response).toEqual({ method: 0, onOff: 0, ckSpell: 1, oldAccent: 1 });
+				expect(env.badge).toEqual({ text: 'off', color: [255, 0, 0, 255] });
+				return env.onMessage({ type: 'turn_avim' }).then(function(again) {
+					expect(again.response.onOff).toBe(1);
+					expect(env.badge).toEqual({ text: 'on', color: [0, 255, 0, 255] });
+				});
+			});
+		});
 	});
 
 	it('fan-out queries only tab ids and pushes prefs to every tab', function() {
-		env.onInstalled('install');
-		var result = env.onMessage({ save_prefs: 'all', onOff: 0 });
-		expect(env.queryArg()).toEqual({});
-		expect(env.tabMessages.length).toBe(2);
-		expect(env.tabMessages[0].tabId).toBe(1);
-		expect(env.tabMessages[1].tabId).toBe(2);
-		expect(env.tabMessages[0].message).toEqual(result.response);
-		expect(env.tabMessages[1].message).toEqual(result.response);
+		return env.onInstalled('install').then(function() {
+			return env.onMessage({ type: 'save_prefs', prefs: { onOff: 0 } }).then(function(result) {
+				expect(env.queryArg()).toEqual({});
+				expect(env.tabMessages.length).toBe(2);
+				expect(env.tabMessages[0].tabId).toBe(1);
+				expect(env.tabMessages[1].tabId).toBe(2);
+				expect(env.tabMessages[0].message).toEqual({ type: 'prefs', prefs: result.response });
+				expect(env.tabMessages[1].message).toEqual({ type: 'prefs', prefs: result.response });
+			});
+		});
 	});
 
-	it('consumes runtime.lastError for every tab delivery', function() {
-		env.onInstalled('install');
-		env.sentErrors.push(1, 2);
-		env.onMessage({ save_prefs: 'all', onOff: 0 });
-		expect(env.lastErrorReads()).toBe(2);
+	it('swallows per-tab delivery errors without an unhandled rejection', function() {
+		unhandledRejections.length = 0;
+		return env.onInstalled('install').then(function() {
+			env.sentErrors.push(1, 2);
+			return env.onMessage({ type: 'save_prefs', prefs: { onOff: 0 } }).then(function(result) {
+				expect(env.tabMessages.length).toBe(2);
+				expect(result.response).toEqual({ method: 0, onOff: 0, ckSpell: 1, oldAccent: 1 });
+				expect(unhandledRejections.length).toBe(0);
+			});
+		});
 	});
 
 	it('leaves unrecognized messages unhandled', function() {
-		var result = env.onMessage({ hello: 'world' });
-		expect(result.returned).toBeUndefined();
-		expect(result.responseCount).toBe(0);
-		expect(env.storage).toEqual({});
-		expect(env.tabMessages.length).toBe(0);
-		expect(env.badge).toEqual({ text: null, color: null });
+		return env.onMessage({ hello: 'world' }).then(function(result) {
+			expect(result.returned).toBeUndefined();
+			expect(result.responseCount).toBe(0);
+			expect(env.storage).toEqual({});
+			expect(env.tabMessages.length).toBe(0);
+			expect(env.badge).toEqual({ text: null, color: null });
+		});
 	});
 });

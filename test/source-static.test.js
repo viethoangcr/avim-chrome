@@ -18,7 +18,7 @@ function listJsFiles(dir) {
 		var full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
 			files = files.concat(listJsFiles(full));
-		} else if (entry.name.slice(-3) === '.js') {
+		} else if (['.js', '.ts'].some(function(ext) { return entry.name.endsWith(ext); })) {
 			files.push(full);
 		}
 	});
@@ -27,7 +27,7 @@ function listJsFiles(dir) {
 
 describe('source messaging (MV3)', function() {
 
-	it('never uses chrome.extension or chrome.browserAction in src/**/*.js', function() {
+	it('never uses chrome.extension or chrome.browserAction in src/**/*.{js,ts}', function() {
 		var offenders = listJsFiles(SRC_DIR).filter(function(file) {
 			var source = fs.readFileSync(file, 'utf8');
 			return FORBIDDEN.some(function(token) {
@@ -35,5 +35,22 @@ describe('source messaging (MV3)', function() {
 			});
 		});
 		expect(offenders).toEqual([]);
+	});
+});
+
+describe('source logging', function() {
+
+	it('never calls console.* in src/scripts/extension.ts', function() {
+		var source = fs.readFileSync(path.join(SRC_DIR, 'scripts/extension.ts'), 'utf8');
+		expect(source.indexOf('console.')).toBe(-1);
+	});
+});
+
+describe('popup.html script references', function() {
+
+	it('loads popup-avim.js and not the raw avim.js bundle', function() {
+		var source = fs.readFileSync(path.join(SRC_DIR, 'popup.html'), 'utf8');
+		expect(source).toContain('src="scripts/popup-avim.js"');
+		expect(source).not.toContain('src="scripts/avim.js"');
 	});
 });
