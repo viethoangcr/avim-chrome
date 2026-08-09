@@ -7,10 +7,12 @@ handling. Typing is processed locally in page inputs; the extension
 collects no user data and declares only the static `storage` permission
 plus HTTP(S) content-script matches.
 
-This is a modified, independently maintained fork of the avim-chrome
-extension by Nguyen Kim Kha, which is based on the AVIM engine by
-Hieu Tran Dang. The upstream authors do not maintain and do not endorse
-this release.
+This is a fork of the avim-chrome extension by Nguyen Kim Kha, which is
+based on the AVIM engine by Hieu Tran Dang. It has been migrated from
+Manifest V2 to Manifest V3 and adjusted for a better Chrome extension:
+a storage-backed service worker, modernized messaging, a TypeScript
+chrome layer, and an esbuild build pipeline. The upstream authors do not
+maintain and do not endorse this release.
 
 ## Install
 
