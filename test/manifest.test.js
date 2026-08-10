@@ -68,8 +68,8 @@ describe('manifest (MV3)', function() {
 		}]);
 	});
 
-	it('is version 0.2.0', function() {
-		expect(manifest.version).toBe('0.2.0');
+	it('is version 0.2.1', function() {
+		expect(manifest.version).toBe('0.2.1');
 	});
 
 	it('package.json version matches the manifest version', function() {
@@ -104,7 +104,7 @@ describe('manifest (MV3)', function() {
 				service_worker: 'chrome/background.js'
 			});
 			expect(buildManifest.permissions).toEqual(['storage']);
-			expect(buildManifest.version).toBe('0.2.0');
+			expect(buildManifest.version).toBe('0.2.1');
 			expect(buildManifest.minimum_chrome_version).toBe('116');
 			expect(buildManifest.browser_action).toBeUndefined();
 			expect(buildManifest.background.scripts).toBeUndefined();

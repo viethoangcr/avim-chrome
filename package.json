@@ -1,6 +1,6 @@
 {
   "name": "avim-chrome",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A locally processed Vietnamese input method (Telex, VNI, VIQR, VIQR*) for Chrome; a modified GPLv3 fork of avim-chrome.",
   "scripts": {
     "lint": "eslint . && tsc --noEmit",
