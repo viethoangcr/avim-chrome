@@ -84,7 +84,7 @@ async function contentBundle() {
     write: false,
     target: 'es2017'
   });
-  const combined = read('src/scripts/avim.js') + '\n' + ext.outputFiles[0].text;
+  const combined = read('src/scripts/avim.js') + '\n' + read('src/scripts/transport.js') + '\n' + ext.outputFiles[0].text;
   const min = await transform(combined, { minify: true, target: 'es2017' });
   write('build/scripts/avim.js', min.code);
 }

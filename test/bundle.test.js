@@ -32,8 +32,10 @@ function flush() {
 }
 
 // Load a built script in a fresh sandbox against a chrome/document mock and
-// return the sandbox context plus the recorded mock activity.
-function loadScript(file) {
+// return the sandbox context plus the recorded mock activity. With
+// opts.modern the documentMock exposes onbeforeinput (feature detect for the
+// modern transport); without it the legacy keypress path is exercised.
+function loadScript(file, opts) {
 	var messages = [];
 	var documentEvents = [];
 	var messageListeners = [];
@@ -65,6 +67,10 @@ function loadScript(file) {
 		removeEventListener: function() {},
 		getElementsByTagName: function() { return []; }
 	};
+
+	if (opts && opts.modern) {
+		documentMock.onbeforeinput = null;
+	}
 
 	var context = {
 		chrome: chrome,
@@ -144,6 +150,36 @@ describe('built content bundle (shared top-level scope)', function() {
 			keyup({ which: 17 });
 			keyup({ which: 17 });
 			expect(env.messages[1]).toEqual({ type: 'turn_avim' });
+		});
+	});
+
+	it('attaches the modern transport and gates legacy keypress when beforeinput is supported', function() {
+		var env = loadScript(CONTENT_BUNDLE, { modern: true });
+		return flush().then(function() {
+			expect(docListener(env, 'beforeinput')).toBe(env.context.AVIMTransport.handleBeforeInput);
+			expect(docListener(env, 'input')).toBe(env.context.AVIMTransport.handleInput);
+			env.documentEvents.forEach(function(entry) {
+				if (entry.evt === 'beforeinput' || entry.evt === 'input') {
+					expect(entry.capture).toBe(true);
+				}
+			});
+			var types = env.documentEvents.map(function(entry) { return entry.evt; });
+			expect(types).not.toContain('keypress');
+			expect(types).toContain('keyup');
+			expect(env.messages[0]).toEqual({ type: 'get_prefs' });
+		});
+	});
+
+	it('keeps the modern transport attached after a prefs push', function() {
+		var env = loadScript(CONTENT_BUNDLE, { modern: true });
+		return flush().then(function() {
+			var before = env.context.AVIMObj;
+			env.messageListeners[0]({ type: 'prefs', prefs: { method: 3 } });
+			expect(env.context.AVIMObj).not.toBe(before);
+			expect(docListener(env, 'beforeinput')).toBe(env.context.AVIMTransport.handleBeforeInput);
+			expect(docListener(env, 'input')).toBe(env.context.AVIMTransport.handleInput);
+			var types = env.documentEvents.map(function(entry) { return entry.evt; });
+			expect(types).not.toContain('keypress');
 		});
 	});
 

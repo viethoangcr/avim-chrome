@@ -13,3 +13,4 @@ declare function checkCode(code: number): boolean;
 declare function upperCase(word: string): string;
 declare function fromCharCode(code: number): string;
 declare function ifMoz(e: any): void;
+declare var AVIMTransport: any;
