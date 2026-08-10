@@ -30,10 +30,14 @@ function AVIMInit(AVIM: any, isAttach: boolean) {
 			if(iframedit && (upperCase(iframedit.designMode) == "ON")) {
 				iframedit.AVIM = AVIM;
 				if (isAttach) {
-					attachEvt(iframedit, "keypress", ifMoz, false);
+					if(!('onbeforeinput' in iframedit)) {
+						attachEvt(iframedit, "keypress", ifMoz, false);
+					}
 					attachEvt(iframedit, "keydown", keyDownHandler, false);
 				} else {
-					attachEvt(iframedit, "keypress", ifMoz, false);
+					if(!('onbeforeinput' in iframedit)) {
+						attachEvt(iframedit, "keypress", ifMoz, false);
+					}
 					attachEvt(iframedit, "keydown", keyDownHandler, false);
 				}
 			}
@@ -174,6 +178,7 @@ function removeOldAVIM() {
 	removeEvt(document, "keydown", keyDownHandler, true);
 	removeEvt(document, "keypress", keyPressHandler, true);
 	removeEvt(document, "keyup", keyUpHandler, true);
+	AVIMTransport.detach(document);
 	
 	// Remove AVIM
 	AVIMInit(AVIMObj, false);
@@ -191,10 +196,12 @@ function newAVIMInit() {
 	AVIMAJAXFix();
 	
 	// Trigger event
-	attachEvt(document, "mouseup", AVIMAJAXFix, false);
-	attachEvt(document, "keydown", keyDownHandler, true);
+	var modern = AVIMTransport.attach(document);
+	if(!modern) {
+		attachEvt(document, "keydown", keyDownHandler, true);
+		attachEvt(document, "keypress", keyPressHandler, true);
+	}
 	attachEvt(document, "keyup", keyUpHandler, true);
-	attachEvt(document, "keypress", keyPressHandler, true);
 }
 
 function configAVIM(data: Prefs) {
