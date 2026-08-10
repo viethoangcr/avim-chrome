@@ -12,7 +12,10 @@ const avimGlobals = {
   checkCode: 'readonly',
   upperCase: 'readonly',
   start: 'readonly',
-  ifMoz: 'readonly'
+  ifMoz: 'readonly',
+  _range: 'writable',
+  AVIMTransport: 'readonly',
+  WeakMap: 'readonly'
 };
 
 export default [
