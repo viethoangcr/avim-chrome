@@ -51,10 +51,11 @@ locales, icons, popup, worker, `LICENSE` and `NOTICE`.
   (content script) are TypeScript, compiled by esbuild. Shared message
   types live in `src/shared/messages.ts`.
 - `src/scripts/avim.js` is the legacy GPL input engine (by Hieu Tran Dang),
-  preserved byte-for-byte. The build consumes it as the concatenated
-  content bundle (`build/scripts/avim.js`) and as the popup demo engine
-  (`build/scripts/popup-avim.js`). A future project migrates it to
-  TypeScript.
+  now maintained in-repo with behavior pinned by the characterization suite
+  in `test/avim.test.js` (methods, configs, spell check). The build consumes
+  it as the concatenated content bundle (`build/scripts/avim.js`) and as the
+  popup demo engine (`build/scripts/popup-avim.js`). A future project
+  migrates it to TypeScript.
 
 ## Source and license
 

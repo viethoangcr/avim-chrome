@@ -60,12 +60,15 @@ function loadScript(file, opts) {
 		configurable: true
 	});
 
+	var observerInstances = [];
+	var iframes = [];
 	var documentMock = {
 		addEventListener: function(evt, handler, capture) {
 			documentEvents.push({ evt: evt, handler: handler, capture: capture });
 		},
 		removeEventListener: function() {},
-		getElementsByTagName: function() { return []; }
+		getElementsByTagName: function() { return iframes; },
+		documentElement: {}
 	};
 
 	if (opts && opts.modern) {
@@ -75,7 +78,22 @@ function loadScript(file, opts) {
 	var context = {
 		chrome: chrome,
 		window: { document: documentMock },
-		setTimeout: setTimeout
+		setTimeout: setTimeout,
+		MutationObserver: function(callback) {
+			var instance = {
+				callback: callback,
+				observeCalls: [],
+				disconnected: false,
+				observe: function(target, options) {
+					instance.observeCalls.push({ target: target, options: options });
+				},
+				disconnect: function() {
+					instance.disconnected = true;
+				}
+			};
+			observerInstances.push(instance);
+			return instance;
+		}
 	};
 
 	vm.runInNewContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context);
@@ -84,7 +102,10 @@ function loadScript(file, opts) {
 		context: context,
 		messages: messages,
 		documentEvents: documentEvents,
-		messageListeners: messageListeners
+		messageListeners: messageListeners,
+		observerInstances: observerInstances,
+		iframes: iframes,
+		documentElement: documentMock.documentElement
 	};
 }
 
@@ -112,10 +133,52 @@ describe('built content bundle (shared top-level scope)', function() {
 		var env = loadScript(CONTENT_BUNDLE);
 		return flush().then(function() {
 			expect(typeof env.context.AVIMObj).toBe('object');
-			expect(env.documentEvents.length).toBeGreaterThanOrEqual(3);
+			expect(env.documentEvents.length).toBeGreaterThanOrEqual(2);
 			var types = env.documentEvents.map(function(entry) { return entry.evt; });
-			expect(types).toContain('keydown');
+			expect(types).not.toContain('keydown');
 			expect(types).toContain('keyup');
+			expect(types).toContain('keypress');
+		});
+	});
+
+	it('does not attach a mouseup polling handler', function() {
+		var env = loadScript(CONTENT_BUNDLE);
+		return flush().then(function() {
+			var types = env.documentEvents.map(function(entry) { return entry.evt; });
+			expect(types).not.toContain('mouseup');
+		});
+	});
+
+	it('observes the document element for added iframes', function() {
+		var env = loadScript(CONTENT_BUNDLE);
+		return flush().then(function() {
+			expect(env.observerInstances.length).toBe(1);
+			var instance = env.observerInstances[0];
+			expect(instance.observeCalls.length).toBe(1);
+			expect(instance.observeCalls[0].target).toBe(env.documentElement);
+			expect(instance.observeCalls[0].options).toEqual({ childList: true, subtree: true });
+		});
+	});
+
+	it('re-initializes when an iframe is added to the DOM', function() {
+		var env = loadScript(CONTENT_BUNDLE);
+		return flush().then(function() {
+			var iframeEvents = [];
+			var fakeIframe = {
+				tagName: 'IFRAME',
+				contentWindow: {
+					document: {
+						designMode: 'ON',
+						wi: null,
+						addEventListener: function(evt, handler, capture) {
+							iframeEvents.push({ evt: evt, handler: handler, capture: capture });
+						}
+					}
+				}
+			};
+			env.iframes.push(fakeIframe);
+			env.observerInstances[0].callback([{ addedNodes: [fakeIframe] }]);
+			var types = iframeEvents.map(function(entry) { return entry.evt; });
 			expect(types).toContain('keypress');
 		});
 	});

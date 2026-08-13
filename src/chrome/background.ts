@@ -51,8 +51,6 @@ async function pushPrefsToTabs(prefs: Prefs): Promise<void> {
 }
 
 async function savePrefs(msg: SavePrefsMessage): Promise<Prefs> {
-	// historical read the original callback flow performed before writing
-	await readPrefs();
 	const changes: Partial<Prefs> = {};
 	for (const field of PREF_FIELDS) {
 		if (Object.prototype.hasOwnProperty.call(msg.prefs, field) && isPrefValue(field, msg.prefs[field])) {

@@ -99,6 +99,15 @@ function typeSequence(m, seq) {
 	return editor.value;
 }
 
+function typeSequenceConfig(m, oa, ck, seq) {
+	setConfig(m, 1, ck, oa);
+	var editor = makeEditor("", 0);
+	for (var i = 0; i < seq.length; i++) {
+		typeChar(editor, seq.charAt(i));
+	}
+	return editor.value;
+}
+
 function caretAfter(m, seq) {
 	setConfig(m, 1, 1, 1);
 	var editor = makeEditor("", 0);
@@ -223,6 +232,235 @@ describe("IME engine characterization:", function() {
 			expect(caretAfter(1, "viets")).toBe(4);
 			expect(caretAfter(2, "viet1")).toBe(4);
 		});
+	});
+
+	describe("AUTO (method 0)", function() {
+		var cases = [
+			["aas", "ấ"],
+			["aaw", "ă"],
+			["dd", "đ"],
+			["o7s", "ớ"],
+			["a1", "á"],
+			["tois", "tói"],
+			["viet1", "viét"],
+			["uow", "uơ"],
+			["uwo", "ưo"],
+			["anhs", "ánh"],
+			["xinh", "xinh"],
+			["aas1", "â1"],
+			["aasw", "ắ"],
+			["d91", "đ1"],
+			["uong1", "uóng"],
+			["aa1", "ấ"],
+			["toansz", "toan"],
+			["TOANS", "TOÁN"],
+			["zas", "zas"],
+			["q", "q"],
+			["aa", "â"], // telex hat
+			["a6", "â"], // vni hat
+			["a^", "a^"], // viqr hat is inert in AUTO
+			["ow", "ơ"], // telex hook
+			["uw", "ư"],
+			["o7", "ơ"], // vni hook
+			["u7", "ư"],
+			["o+", "o+"], // viqr hook is inert in AUTO
+			["u+", "u+"],
+			["o*", "o*"], // viqr* hook is inert in AUTO
+			["u*", "u*"],
+			["d9", "đ"],
+			["dD", "đ"],
+			["as", "á"], // telex tones
+			["af", "à"],
+			["ar", "ả"],
+			["ax", "ã"],
+			["aj", "ạ"],
+			["a2", "à"], // vni tones
+			["a3", "ả"],
+			["a4", "ã"],
+			["a5", "ạ"],
+			["asz", "a"], // tone removal (telex z, vni 0)
+			["a10", "a"],
+			["a'-", "a'-"], // viqr tone/removal keys are inert in AUTO
+			["toan'.", "toan'."],
+			["\\'", "\\'"],
+			["\\.", "\\."],
+			["toanx", "toãn"] // normalize path
+		];
+
+		cases.forEach(function(testcase) {
+			it('types "' + testcase[0] + '" as "' + testcase[1] + '"', function() {
+				expect(typeSequence(0, testcase[0])).toBe(testcase[1]);
+			});
+		});
+	});
+
+	describe("VIQR (method 3)", function() {
+		var cases = [
+			["a^", "â"],
+			["a'", "á"],
+			["a.", "ạ"],
+			["dD", "đ"],
+			["u+", "ư"],
+			["aw", "aw"],
+			["as", "as"],
+			["as'", "as'"],
+			["a'-", "a"], // tone removal
+			["\\'", "'"], // backslash escape
+			["q", "q"],
+			["o+", "ơ"],
+			["a`", "à"], // all 5 tone keys
+			["a?", "ả"],
+			["a~", "ã"],
+			["o+'", "ớ"], // composed ơ + tone
+			["o+`", "ờ"],
+			["o+.", "ợ"],
+			["o+?", "ở"],
+			["o+~", "ỡ"],
+			["u+.", "ự"],
+			["o+-", "o"], // removal from a composed word
+			["toan`-", "toan"],
+			["toan?-", "toan"],
+			["toan'", "toán"], // normalize path
+			["toan'.", "toạn"],
+			["toan'x", "toánx"],
+			["TOAN'", "TOÁN"] // uppercase word
+		];
+
+		cases.forEach(function(testcase) {
+			it('types "' + testcase[0] + '" as "' + testcase[1] + '"', function() {
+				expect(typeSequence(3, testcase[0])).toBe(testcase[1]);
+			});
+		});
+	});
+
+	describe("VIQR* (method 4)", function() {
+		var cases = [
+			["o*", "ơ"],
+			["aa", "aa"],
+			["dD", "đ"],
+			["a*", "a*"],
+			["a*-", "a*-"],
+			["q", "q"],
+			["u*", "ư"],
+			["a'", "á"], // all 5 tone keys
+			["a`", "à"],
+			["a.", "ạ"],
+			["a?", "ả"],
+			["a~", "ã"],
+			["o*'", "ớ"], // composed ơ + tone
+			["o*`", "ờ"],
+			["o*.", "ợ"],
+			["o*?", "ở"],
+			["o*~", "ỡ"],
+			["toan*", "toan*"],
+			["toan'.", "toạn"], // normalize path
+			["toan'x", "toánx"],
+			["TOAN'", "TOÁN"], // uppercase word
+			["\\'", "'"] // backslash escape
+		];
+
+		cases.forEach(function(testcase) {
+			it('types "' + testcase[0] + '" as "' + testcase[1] + '"', function() {
+				expect(typeSequence(4, testcase[0])).toBe(testcase[1]);
+			});
+		});
+	});
+
+	describe("Telex tone removal (Z key)", function() {
+		var cases = [
+			["asz", "a"],
+			["zas", "zas"],
+			["toansz", "toan"]
+		];
+
+		cases.forEach(function(testcase) {
+			it('types "' + testcase[0] + '" as "' + testcase[1] + '"', function() {
+				expect(typeSequence(1, testcase[0])).toBe(testcase[1]);
+			});
+		});
+	});
+
+	describe("oldAccent 0 vs 1", function() {
+		var pairs = [
+			[1, "thuys", "thuý", "thúy"],
+			[1, "hoas", "hoá", "hóa"],
+			[1, "khoes", "khoé", "khóe"],
+			[2, "thuy1", "thuý", "thúy"],
+			[2, "hoa1", "hoá", "hóa"],
+			[2, "khoe1", "khoé", "khóe"]
+		];
+
+		pairs.forEach(function(testcase) {
+			it('method ' + testcase[0] + ' types "' + testcase[1] + '" as "' + testcase[2] + '" (oldAccent 0) vs "' + testcase[3] + '" (oldAccent 1)', function() {
+				expect(typeSequenceConfig(testcase[0], 0, 1, testcase[1])).toBe(testcase[2]);
+				expect(typeSequenceConfig(testcase[0], 1, 1, testcase[1])).toBe(testcase[3]);
+			});
+		});
+	});
+
+	describe("checkSpell 0 vs 1", function() {
+		it('non-word "azs" gets the tone with checkSpell 0, stays literal with checkSpell 1', function() {
+			expect(typeSequenceConfig(1, 1, 0, "azs")).toBe("áz");
+			expect(typeSequenceConfig(1, 1, 1, "azs")).toBe("azs");
+		});
+
+		it('"hòang" + "t" with checkSpell 0 normalizes to "hoàngt"', function() {
+			setConfig(1, 1, 0, 1);
+			var editor = makeEditor("hòang", 5);
+			typeChar(editor, "t");
+			expect(editor.value).toBe("hoàngt");
+		});
+
+		it('"hòang" + "t" with checkSpell 1 stays "hòangt"', function() {
+			setConfig(1, 1, 1, 1);
+			var editor = makeEditor("hòang", 5);
+			typeChar(editor, "t");
+			expect(editor.value).toBe("hòangt");
+		});
+	});
+
+});
+
+describe("spell check off (normalize path)", function() {
+
+	it('"hòang" + "t" with checkSpell 0 normalizes to "hoàngt"', function() {
+		setConfig(1, 1, 0, 1);
+		var editor = makeEditor("hòang", 5);
+		typeChar(editor, "t");
+		expect(editor.value).toBe("hoàngt");
+	});
+
+	it('"hòang" + "t" with checkSpell 1 stays "hòangt"', function() {
+		setConfig(1, 1, 1, 1);
+		var editor = makeEditor("hòang", 5);
+		typeChar(editor, "t");
+		expect(editor.value).toBe("hòangt");
+	});
+
+	it('"azs" with checkSpell 0 gets the tone "áz"', function() {
+		setConfig(1, 1, 0, 1);
+		var editor = makeEditor("", 0);
+		typeChar(editor, "a");
+		typeChar(editor, "z");
+		typeChar(editor, "s");
+		expect(editor.value).toBe("áz");
+	});
+
+});
+
+describe("constant tables (white-box pins)", function() {
+
+	it("getSF() returns one shared array (hoisted constant)", function() {
+		expect(getSF()).toBe(getSF());
+	});
+
+	it("repSign(null) returns a 120-element fresh array per call", function() {
+		setConfig(1, 1, 1, 1);
+		typeChar(makeEditor("a", 1), "s");
+		expect(repSign(null).length).toBe(120);
+		var a = repSign(null);
+		a.push(1);
+		expect(repSign(null).length).toBe(120);
 	});
 
 });
