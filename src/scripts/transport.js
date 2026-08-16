@@ -125,12 +125,23 @@ var AVIMTransport = {
 		}
 		_range = savedRange;
 		AVIMObj.specialChange = false;
-		if(!AVIMObj.changed) {
+		// changed=false can still carry a mutation: tone/hat removal returns
+		// a base-char *string* (findC: fromCharCode($_skey[h])), which
+		// replaceChar applies without setting changed. MV2 wrote it straight
+		// to the live DOM and let the browser insert the key; mirror that by
+		// flushing the buffer and appending the literal key.
+		var bufferChanged = snap.node ? (editor.data != snap.oldText) : (editor.value != snap.oldValue);
+		var keyIsLiteral = !AVIMObj.changed;
+		if(!AVIMObj.changed && !bufferChanged) {
 			AVIMObj.changed = false;
 			return;
 		}
 		AVIMObj.changed = false;
 		if(snap.node) {
+			if(keyIsLiteral) {
+				editor.data = editor.data.substr(0, editor.pos) + snap.data + editor.data.substr(editor.pos);
+				editor.pos++;
+			}
 			snap.node.data = editor.data;
 			var range = document.createRange();
 			range.setStart(snap.node, editor.pos);
@@ -141,6 +152,12 @@ var AVIMTransport = {
 				sel.addRange(range);
 			}
 		} else {
+			if(keyIsLiteral) {
+				var s = editor.selectionStart;
+				editor.value = editor.value.substr(0, s) + snap.data + editor.value.substr(s);
+				editor.selectionStart++;
+				editor.selectionEnd++;
+			}
 			root.value = editor.value;
 			root.setSelectionRange(editor.selectionStart, editor.selectionEnd);
 			root.scrollTop = editor.scrollTop;

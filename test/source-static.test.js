@@ -46,6 +46,18 @@ describe('source logging', function() {
 	});
 });
 
+describe('source dead code', function() {
+
+	it('removes vestiges from extension.ts and avim.js', function() {
+		var extensionSource = fs.readFileSync(path.join(SRC_DIR, 'scripts/extension.ts'), 'utf8');
+		['findFrame', '_keyDownHandler', 'keyDownHandler'].forEach(function(token) {
+			expect(extensionSource.indexOf(token)).toBe(-1);
+		});
+		var avimSource = fs.readFileSync(path.join(SRC_DIR, 'scripts/avim.js'), 'utf8');
+		expect(avimSource.indexOf('useCookie')).toBe(-1);
+	});
+});
+
 describe('popup.html script references', function() {
 
 	it('loads popup-avim.js and not the raw avim.js bundle', function() {

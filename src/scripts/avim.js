@@ -30,7 +30,6 @@ var method = 0, //Default input method: 0=AUTO, 1=TELEX, 2=VNI, 3=VIQR, 4=VIQR*
 	  onOff = 1, //Starting status: 0=Off, 1=On
 	  checkSpell = 1, //Spell Check: 0=Off, 1=On
 	  oldAccent = 1, //0: New way (oa`, oe`, uy`), 1: The good old day (o`a, o`e, u`y)
-	  useCookie = 0, //Cookies: 0=Off, 1=On
 	  exclude = ["email"]; //IDs of the fields you DON'T want to let users type Vietnamese in
 
 //Set to true the methods which you want to be included in the AUTO method
@@ -82,6 +81,9 @@ function AVIM()	{
 	this.skey2 = "a,a,a,e,e,i,o,o,o,u,u,y,A,A,A,E,E,I,O,O,O,U,U,Y".split(',');
 
 	this.spellerr = (checkSpell == 1) ? ckspell : nospell;
+	this.methods = buildMethods();
+	this.bya = [this.db1, this.ab1, this.eb1, this.ob1, this.mocb1, this.trangb1];
+	this.sfa = [this.ds1, this.as1, this.es1, this.os1, this.mocs1, this.trangs1];
 
 }
 
@@ -89,12 +91,16 @@ function fromCharCode(x) {
 	return String.fromCharCode(x);
 }
 
-function getSF() {
+var $_sf = (function() {
 	var sf = [], x;
 	for(x = 0; x < $_skey.length; x++) {
 		sf[sf.length] = fromCharCode($_skey[x]);
 	}
 	return sf;
+})();
+
+function getSF() {
+	return $_sf;
 }
 
 function nospell(word, k) {
@@ -311,10 +317,9 @@ function mozGetText(editor) {
 	return [word, pos];
 }
 
-function start(obj, key) {
-	var word = "", dockspell = checkSpell, uni, uni2 = false, uni3 = false, uni4 = false;
-	AVIMObj.oc=obj;
-	var telex = "D,A,E,O,W,W".split(','), vni = "9,6,6,6,7,8".split(','), viqr = "D,^,^,^,+,(".split(','), viqr2 = "D,^,^,^,*,(".split(','), a, noNormC;
+function buildMethods() {
+	var telex = "D,A,E,O,W,W".split(','), vni = "9,6,6,6,7,8".split(','), viqr = "D,^,^,^,+,(".split(','), viqr2 = "D,^,^,^,*,(".split(','), a;
+	var uni, uni2 = false, uni3 = false, uni4 = false, D2;
 	if(method === 0) { // AUTO Method
 		var arr = [], check = AVIMAutoConfig;
 		var value1 = [telex, vni, viqr, viqr2], uniA = [uni, uni2, uni3, uni4], D2A = ["DAWEO", "6789", "D^+(", "D^*("];
@@ -332,25 +337,33 @@ function start(obj, key) {
 		uni2 = uniA[1];
 		uni3 = uniA[2];
 		uni4 = uniA[3];
-		AVIMObj.D2 = D2A.join();
-		if(!uni) {
-			return;
-		}
+		D2 = D2A.join();
+		return { uni: uni, uni2: uni2, uni3: uni3, uni4: uni4, D2: D2 };
 	} else if(method == 1) { // TELEX Method
 		uni = telex;
-		AVIMObj.D2 = "DAWEO";
+		D2 = "DAWEO";
 	}
 	else if(method == 2) { // VNI Method
 		uni = vni;
-		AVIMObj.D2 = "6789";
+		D2 = "6789";
 	}
 	else if(method == 3) { // VIQR Method
 		uni = viqr;
-		AVIMObj.D2 = "D^+(";
+		D2 = "D^+(";
 	}
 	else if(method == 4) { // VIQR2 Method
 		uni = viqr2;
-		AVIMObj.D2 = "D^*(";
+		D2 = "D^*(";
+	}
+	return { uni: uni, D2: D2 };
+}
+
+function start(obj, key) {
+	var word = "", dockspell = checkSpell, uni, uni2 = false, uni3 = false, uni4 = false, noNormC, m = AVIMObj.methods;
+	AVIMObj.oc=obj;
+	uni = m.uni; uni2 = m.uni2; uni3 = m.uni3; uni4 = m.uni4; AVIMObj.D2 = m.D2;
+	if(!uni) {
+		return;
 	}
 
 	key = fromCharCode(key.which);
@@ -675,80 +688,108 @@ function tr(k, word, by, sf, i) {
 	return false;
 }
 
+var $_t = "d,D,a,A,a,A,o,O,u,U,e,E,o,O".split(",");
+
+var $_maps = {
+	vni: {
+		DAWEO: "6789",
+		SFJRX: "12534",
+		S: "1",
+		F: "2",
+		J: "5",
+		R: "3",
+		X: "4",
+		Z: "0",
+		D: "9",
+		FRX: "234",
+		AEO: "6",
+		moc: "7",
+		trang: "8",
+		them: "678",
+		A: "^",
+		E: "^",
+		O: "^"
+	},
+	viqr: {
+		DAWEO: "^+(D",
+		SFJRX: "'`.?~",
+		S: "'",
+		F: "`",
+		J: ".",
+		R: "?",
+		X: "~",
+		Z: "-",
+		D: "D",
+		FRX: "`?~",
+		AEO: "^",
+		moc: "+",
+		trang: "(",
+		them: "^+(",
+		A: "^",
+		E: "^",
+		O: "^"
+	},
+	viqr2: {
+		DAWEO: "^*(D",
+		SFJRX: "'`.?~",
+		S: "'",
+		F: "`",
+		J: ".",
+		R: "?",
+		X: "~",
+		Z: "-",
+		D: "D",
+		FRX: "`?~",
+		AEO: "^",
+		moc: "*",
+		trang: "(",
+		them: "^*(",
+		A: "^",
+		E: "^",
+		O: "^"
+	},
+	telex: {
+		SFJRX: "SFJRX",
+		DAWEO: "DAWEO",
+		D: 'D',
+		S: 'S',
+		F: 'F',
+		J: 'J',
+		R: 'R',
+		X: 'X',
+		Z: 'Z',
+		FRX: "FRX",
+		them: "AOEW",
+		trang: "W",
+		moc: "W",
+		A: "A",
+		E: "E",
+		O: "O"
+	}
+};
+
+function applyMap(m) {
+	var f;
+	for(f in m) {
+		AVIMObj[f] = m[f];
+	}
+}
+
 function main(word, k, i, a, noNormC) {
-	var uk = upperCase(k), bya = [AVIMObj.db1, AVIMObj.ab1, AVIMObj.eb1, AVIMObj.ob1, AVIMObj.mocb1, AVIMObj.trangb1], got = false, t = "d,D,a,A,a,A,o,O,u,U,e,E,o,O".split(",");
-	var sfa = [AVIMObj.ds1, AVIMObj.as1, AVIMObj.es1, AVIMObj.os1, AVIMObj.mocs1, AVIMObj.trangs1], by = [], sf = [], h, g;
+	var uk = upperCase(k), bya = AVIMObj.bya, got = false, t = $_t;
+	var sfa = AVIMObj.sfa, by = [], sf = [], h, g, map;
 	if((method == 2) || ((method === 0) && (a[0] == "9"))) {
-		AVIMObj.DAWEO = "6789";
-		AVIMObj.SFJRX = "12534";
-		AVIMObj.S = "1";
-		AVIMObj.F = "2";
-		AVIMObj.J = "5";
-		AVIMObj.R = "3";
-		AVIMObj.X = "4";
-		AVIMObj.Z = "0";
-		AVIMObj.D = "9";
-		AVIMObj.FRX = "234";
-		AVIMObj.AEO = "6";
-		AVIMObj.moc = "7";
-		AVIMObj.trang = "8";
-		AVIMObj.them = "678";
-		AVIMObj.A = "^";
-		AVIMObj.E = "^";
-		AVIMObj.O = "^";
+		map = $_maps.vni;
 	} else if((method == 3) || ((method === 0) && (a[4] == "+"))) {
-		AVIMObj.DAWEO = "^+(D";
-		AVIMObj.SFJRX = "'`.?~";
-		AVIMObj.S = "'";
-		AVIMObj.F = "`";
-		AVIMObj.J = ".";
-		AVIMObj.R = "?";
-		AVIMObj.X = "~";
-		AVIMObj.Z = "-";
-		AVIMObj.D = "D";
-		AVIMObj.FRX = "`?~";
-		AVIMObj.AEO = "^";
-		AVIMObj.moc = "+";
-		AVIMObj.trang = "(";
-		AVIMObj.them = "^+(";
-		AVIMObj.A = "^";
-		AVIMObj.E = "^";
-		AVIMObj.O = "^";
+		map = $_maps.viqr;
 	} else if((method == 4) || ((method === 0) && (a[4] == "*"))) {
-		AVIMObj.DAWEO = "^*(D";
-		AVIMObj.SFJRX = "'`.?~";
-		AVIMObj.S = "'";
-		AVIMObj.F = "`";
-		AVIMObj.J = ".";
-		AVIMObj.R = "?";
-		AVIMObj.X = "~";
-		AVIMObj.Z = "-";
-		AVIMObj.D = "D";
-		AVIMObj.FRX = "`?~";
-		AVIMObj.AEO = "^";
-		AVIMObj.moc = "*";
-		AVIMObj.trang = "(";
-		AVIMObj.them = "^*(";
-		AVIMObj.A = "^";
-		AVIMObj.E = "^";
-		AVIMObj.O = "^";
+		map = $_maps.viqr2;
 	} else if((method == 1) || ((method === 0) && (a[0] == "D"))) {
-		AVIMObj.SFJRX = "SFJRX";
-		AVIMObj.DAWEO = "DAWEO";
-		AVIMObj.D = 'D';
-		AVIMObj.S = 'S';
-		AVIMObj.F = 'F';
-		AVIMObj.J = 'J';
-		AVIMObj.R = 'R';
-		AVIMObj.X = 'X';
-		AVIMObj.Z = 'Z';
-		AVIMObj.FRX = "FRX";
-		AVIMObj.them = "AOEW";
-		AVIMObj.trang = "W";
-		AVIMObj.moc = "W";
-		AVIMObj.A = "A";
-		AVIMObj.E = "E";
-		AVIMObj.O = "O";
+		map = $_maps.telex;
+	}
+	if(map && (AVIMObj._map != map)) {
+		AVIMObj._map = map;
+		applyMap(map);
 	}
 	if(AVIMObj.SFJRX.indexOf(uk) >= 0) {
 		var ret = sr(word,k,i);
@@ -848,7 +889,7 @@ function normC(word, k, i) {
 				if(!AVIMObj.oc.data) {
 					AVIMObj.oc.setSelectionRange(pos, pos);
 				}
-				if(!ckspell(word, fS)) {
+				if(!AVIMObj.spellerr(word, fS)) {
 					replaceChar(AVIMObj.oc, i - j, c);
 					var a = [AVIMObj.D];
 					if(!AVIMObj.oc.data) {
@@ -924,13 +965,21 @@ function unV2(word) {
 	return word;
 }
 
+var $_repSignCache = null;
+
 function repSign(k) {
+	if((k === null) && $_repSignCache && ($_repSignCache.sfjrx === AVIMObj.SFJRX)) {
+		return $_repSignCache.u.slice();
+	}
 	var t = [], u = [], a, b;
 	for(a = 0; a < 5; a++) {
 		if((k === null)||(AVIMObj.SFJRX.substr(a, 1) != upperCase(k))) {
 			t = retKC(AVIMObj.SFJRX.substr(a, 1));
 			for(b = 0; b < t.length; b++) u[u.length] = t[b];
 		}
+	}
+	if(k === null) {
+		$_repSignCache = { sfjrx: AVIMObj.SFJRX, u: u.slice() };
 	}
 	return u;
 }

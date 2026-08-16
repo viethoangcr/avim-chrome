@@ -12,6 +12,8 @@ const avimGlobals = {
   checkCode: 'readonly',
   upperCase: 'readonly',
   start: 'readonly',
+  getSF: 'readonly',
+  repSign: 'readonly',
   ifMoz: 'readonly',
   _range: 'writable',
   AVIMTransport: 'readonly',
