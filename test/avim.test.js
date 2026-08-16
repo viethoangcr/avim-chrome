@@ -158,7 +158,9 @@ describe("IME engine characterization:", function() {
 			["uong", "uong"],
 			["uongs", "uóng"],
 			["a1", "a1"], // VNI digits are inert in Telex
-			["a6", "a6"]
+			["a6", "a6"],
+			["tests", "tets"], // same-tone repeat removes the tone, key stays literal (UniKey parity)
+			["testa", "téta"], // non-tone key after toned word: tone stays, key literal
 		];
 
 		cases.forEach(function(testcase) {

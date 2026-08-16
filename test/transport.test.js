@@ -154,6 +154,26 @@ describe("IME transport (beforeinput/input):", function() {
 		expect(el.events.length).toBe(1);
 	});
 
+	it("telex: trailing tone key after an accented word stays literal and removes the tone (tets regression)", function() {
+		setConfig(1, 1, 1, 1);
+		var el = makeInputEl("");
+		"tests".split("").forEach(function(ch) {
+			typeCharInput(el, ch);
+		});
+		expect(el.value).toBe("tets");
+		expect(el.selectionStart).toBe(4);
+		expect(el.events.length).toBe(3);
+	});
+
+	it("telex: tone-removal key lands at the caret, not the end, when text follows", function() {
+		setConfig(1, 1, 1, 1);
+		var el = makeInputEl("tétx");
+		el.setSelectionRange(3, 3);
+		typeCharInput(el, "s");
+		expect(el.value).toBe("tetsx");
+		expect(el.selectionStart).toBe(4);
+	});
+
 	it("passes through when the engine makes no change (no synthetic, no rewrite)", function() {
 		setConfig(2, 1, 1, 1);
 		var el = makeInputEl("");
@@ -284,6 +304,29 @@ describe("IME transport (beforeinput/input):", function() {
 			typeCharCE(root2, node2, 2, "1");
 			expect(node2.data).toBe("día");
 			expect(root2.events.length).toBe(1);
+		});
+
+		it("telex: tone-key removal mutation with literal key survives in contenteditable", function() {
+			setConfig(1, 1, 1, 1);
+			var root = makeCERoot();
+			var node = makeTextNode("");
+			typeCharCE(root, node, 0, "t");
+			typeCharCE(root, node, 1, "e");
+			typeCharCE(root, node, 2, "s");
+			typeCharCE(root, node, 2, "t");
+			typeCharCE(root, node, 3, "s");
+			expect(node.data).toBe("tets");
+			expect(rangeRec.node).toBe(node);
+			expect(rangeRec.offset).toBe(4);
+		});
+
+		it("telex: mid-word tone-removal keeps trailing text in place in contenteditable", function() {
+			setConfig(1, 1, 1, 1);
+			var root = makeCERoot();
+			var node = makeTextNode("tétx");
+			typeCharCE(root, node, 3, "s");
+			expect(node.data).toBe("tetsx");
+			expect(rangeRec.offset).toBe(4);
 		});
 	});
 });
